@@ -1,54 +1,68 @@
 #include <Servo.h>
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
 
-// Налаштування мотору
+// Налаштування RF24
+RF24 radio(7, 8); // CE та CSN піни для nRF24L01
+const byte address[6] = "00001"; // Адреса зв'язку
+
+// Налаштування мотору та сервоприводів
 Servo motor;
-int joyMotorPin = A2;   // Пін для осі лівого джойстика (керування мотором)
+Servo servoX;
+Servo servoY;
 int motorPin = 9;       // Пін для мотору
-int motorSpeed = 1500;  // Початкове значення для ESC регуляторів
+int servoXPin = 10;     // Пін для серво X
+int servoYPin = 11;     // Пін для серво Y
 
-// Налаштування сервоприводів
-Servo servoX;           // Сервопривід по осі X
-Servo servoY;           // Сервопривід по осі Y
-int joystickX = A0;     // Пін для осі X правого джойстика
-int joystickY = A1;     // Пін для осі Y правого джойстика
+// Дані для прийому
+struct DataPacket {
+  int motorSpeed;
+  int angleX;
+  int angleY;
+};
+DataPacket data;
 
 void setup() {
-  // Налаштовуємо мотор
-  motor.attach(motorPin, 1000, 2300);  // Підключаємо мотор до піна 9 з діапазоном ШІМ від 1 до 2.3 мс
-
-  // Налаштовуємо серво
-  servoX.attach(10);  // Пін 10 для серво X
-  servoY.attach(11);  // Пін 11 для серво Y
+  // Ініціалізуємо мотор і серво
+  motor.attach(motorPin, 1000, 2300);
+  servoX.attach(servoXPin);
+  servoY.attach(servoYPin);
 
   // Ініціалізуємо серійну комунікацію для моніторингу
   Serial.begin(9600);
+
+  // Налаштовуємо радіо
+  radio.begin();
+  radio.openReadingPipe(0, address); // Відкриваємо канал для читання
+  radio.setPALevel(RF24_PA_HIGH);    // Встановлюємо потужність сигналу
+  radio.startListening();            // Вмикаємо режим читання
 }
 
 void loop() {
-  // Читаємо значення з лівого джойстика для керування мотором
-  int joyMotorValue = analogRead(joyMotorPin);
-  motorSpeed = map(joyMotorValue, 0, 1023, 10, 130);
-  motor.write(motorSpeed);  // Встановлюємо швидкість мотора
+  // Перевіряємо, чи прийшли дані з антени
+  if (radio.available()) {
+    radio.read(&data, sizeof(data)); // Читаємо дані в структуру
 
-  // Читаємо значення з правого джойстика для керування сервоприводами
-  int valX = analogRead(joystickX);
-  int valY = analogRead(joystickY);
+    // Керування мотором
+    int motorSpeed = map(data.motorSpeed, 0, 1023, 10, 130);
+    motor.write(motorSpeed);
 
-  // Мапуємо значення на діапазон від 0 до 180 градусів для серво
-  int angleX = map(valX, 0, 1023, 0, 180);
-  int angleY = map(valY, 0, 1023, 0, 180);
+    // Керування сервоприводами
+    int angleX = map(data.angleX, 0, 1023, 0, 180);
+    int angleY = map(data.angleY, 0, 1023, 0, 180);
 
-  // Керування серво
-  servoX.write(angleX);
-  servoY.write(angleY);
+    servoX.write(angleX);
+    servoY.write(angleY);
 
-  // Вивід у серійний монітор
-  Serial.print("Motor Speed: ");
-  Serial.print(motorSpeed);
-  Serial.print(" | X angle: ");
-  Serial.print(angleX);
-  Serial.print(" | Y angle: ");
-  Serial.println(angleY);
+    // Вивід даних у серійний монітор
+    Serial.print("Motor Speed: ");
+    Serial.print(motorSpeed);
+    Serial.print(" | X angle: ");
+    Serial.print(angleX);
+    Serial.print(" | Y angle: ");
+    Serial.println(angleY);
+  }
 
   delay(20);  // Невелика затримка для стабільності
 }

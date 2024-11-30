@@ -1,0 +1,44 @@
+#include <Servo.h> 
+ 
+// Підключення пінів 
+const int motorJoystickPin = A0;  // Лівий джойстик (вісь Y) 
+const int aileronJoystickPin = A1;  // Правий джойстик (вісь X) 
+ 
+const int motorServoPin = 9;  // Сервопривід для двигуна 
+const int aileronServoPin = 10;  // Сервопривід для елеронів 
+ 
+// Створення об'єктів сервоприводів 
+Servo motorServo; 
+Servo aileronServo; 
+ 
+void setup() { 
+  // Підключення сервоприводів 
+  motorServo.attach(motorServoPin); 
+  aileronServo.attach(aileronServoPin); 
+   
+  // Ініціалізація серіального монітору для відладки 
+  Serial.begin(9600); 
+} 
+ 
+void loop() { 
+  // Зчитування значень з джойстиків 
+  int motorValue = analogRead(motorJoystickPin);   // 0-1023 
+  int aileronValue = analogRead(aileronJoystickPin); // 0-1023 
+ 
+  // Перетворення значень у кути (0-180 градусів) 
+  int motorAngle = map(motorValue, 0, 1023, 0, 180); 
+  int aileronAngle = map(aileronValue, 0, 1023, 0, 180); 
+ 
+  // Встановлення кутів для сервоприводів 
+  motorServo.write(motorAngle); 
+  aileronServo.write(aileronAngle); 
+ 
+  // Виведення даних для відладки 
+  Serial.print("Motor Angle: "); 
+  Serial.print(motorAngle); 
+  Serial.print(" | Aileron Angle: "); 
+  Serial.println(aileronAngle); 
+ 
+  // Затримка для стабільності 
+  delay(20); 
+}

@@ -1,44 +1,55 @@
-#include <Servo.h> 
- 
-// Підключення пінів 
-const int motorJoystickPin = A0;  // Лівий джойстик (вісь Y) 
-const int aileronJoystickPin = A1;  // Правий джойстик (вісь X) 
- 
-const int motorServoPin = 9;  // Сервопривід для двигуна 
-const int aileronServoPin = 10;  // Сервопривід для елеронів 
- 
-// Створення об'єктів сервоприводів 
-Servo motorServo; 
-Servo aileronServo; 
- 
-void setup() { 
-  // Підключення сервоприводів 
-  motorServo.attach(motorServoPin); 
-  aileronServo.attach(aileronServoPin); 
-   
-  // Ініціалізація серіального монітору для відладки 
-  Serial.begin(9600); 
-} 
- 
-void loop() { 
-  // Зчитування значень з джойстиків 
-  int motorValue = analogRead(motorJoystickPin);   // 0-1023 
-  int aileronValue = analogRead(aileronJoystickPin); // 0-1023 
- 
-  // Перетворення значень у кути (0-180 градусів) 
-  int motorAngle = map(motorValue, 0, 1023, 0, 180); 
-  int aileronAngle = map(aileronValue, 0, 1023, 0, 180); 
- 
-  // Встановлення кутів для сервоприводів 
-  motorServo.write(motorAngle); 
-  aileronServo.write(aileronAngle); 
- 
-  // Виведення даних для відладки 
-  Serial.print("Motor Angle: "); 
-  Serial.print(motorAngle); 
-  Serial.print(" | Aileron Angle: "); 
-  Serial.println(aileronAngle); 
- 
-  // Затримка для стабільності 
-  delay(20); 
+#include <SPI.h>
+#include <nRF24L01.h>
+#include <RF24.h>
+
+// Налаштування RF24
+RF24 radio(7, 8); // CE та CSN піни для nRF24L01
+const byte address[6] = "00001"; // Адреса зв'язку
+
+// Підключення пінів
+const int motorJoystickPin = A0;  // Лівий джойстик (вісь Y)
+const int aileronJoystickPin = A1;  // Правий джойстик (вісь X)
+
+// Дані для передачі
+struct DataPacket {
+  int motorSpeed;
+  int angleX;
+  int angleY;
+};
+DataPacket data;
+
+void setup() {
+  // Ініціалізація радіомодуля
+  radio.begin();
+  radio.openWritingPipe(address); // Відкриваємо канал для запису
+  radio.setPALevel(RF24_PA_HIGH); // Встановлюємо потужність сигналу
+  radio.stopListening();          // Переходимо в режим передачі
+
+  // Ініціалізація серіального монітору для відладки
+  Serial.begin(9600);
+}
+
+void loop() {
+  // Зчитування значень з джойстиків
+  data.motorSpeed = analogRead(motorJoystickPin);   // 0-1023
+  data.angleX = analogRead(aileronJoystickPin);     // 0-1023
+  data.angleY = 512;                                // Додатковий канал, якщо потрібно
+
+  // Передача даних
+  bool success = radio.write(&data, sizeof(data));
+
+  // Виведення даних для відладки
+  if (success) {
+    Serial.print("Sent Data | Motor: ");
+    Serial.print(data.motorSpeed);
+    Serial.print(" | Aileron X: ");
+    Serial.print(data.angleX);
+    Serial.print(" | Aileron Y: ");
+    Serial.println(data.angleY);
+  } else {
+    Serial.println("Transmission failed");
+  }
+
+  // Затримка для стабільності
+  delay(20);
 }
